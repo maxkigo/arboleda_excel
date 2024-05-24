@@ -5,8 +5,24 @@ from google.oauth2 import service_account
 from google.cloud import bigquery
 import base64
 
-st.title('Parque Arboleda')
+st.set_page_config(
+    page_title="Kigo",
+    layout="wide"
+)
 
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    st.write()
+
+with col2:
+    st.image('https://main.d1jmfkauesmhyk.amplifyapp.com/img/logos/logos.png')
+
+with col3:
+    st.title('Kigo Analítica')
+
+with col4:
+    st.write()
 
 # Create API client.
 credentials = service_account.Credentials.from_service_account_info(
@@ -14,7 +30,16 @@ credentials = service_account.Credentials.from_service_account_info(
 )
 client = bigquery.Client(credentials=credentials)
 
-uploaded_file = st.file_uploader('Choose an excel file', type=['xlsx', 'xls'])
+col5, col6, col7 = st.columns(3)
+
+with col5:
+    st.write()
+
+with col6:
+    uploaded_file = st.file_uploader('Choose an excel file', type=['xlsx', 'xls'])
+
+with col7:
+    st.write()
 
 # Condicional y garantia de lectura
 if uploaded_file is not None:
@@ -82,8 +107,19 @@ for index, row in df.iterrows():
         df.at[index, 'Fecha/Hora Kigo'] = salida
         df.at[index, 'QR'] = salida_kigo
 
-st.write("Análisis")
+st.markdown("""
+    <style>
+    .dataframe {
+        width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 st.dataframe(df)
+
+
 @st.cache_data
 def get_binary_file_downloader_html(bin_file, file_label='File'):
     with open(bin_file, 'rb') as f:
@@ -97,3 +133,5 @@ if st.button('Descargar tabla como Excel'):
             df.to_excel(writer, index=False)
         st.success('Tabla descargada exitosamente!')
         st.markdown(get_binary_file_downloader_html('kigo_arboleda.xlsx', 'Descargar tabla como Excel'), unsafe_allow_html=True)
+
+
