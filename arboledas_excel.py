@@ -3,6 +3,7 @@ import streamlit as st
 import numpy as np
 from google.oauth2 import service_account
 from google.cloud import bigquery
+import base64
 
 st.title('Parque Arboleda')
 
@@ -26,13 +27,6 @@ if uploaded_file is not None:
     else:
         st.error('Porfavor sube un archivo excel')
 
-# Advertir de estándar del cliente
-filas_eliminar = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-
-df = df.drop(filas_eliminar, axis=0)
-
-df.columns = df.iloc[0]
-
 # Drop la primer fila que ahora es el header
 df = df[1:]
 
@@ -54,7 +48,7 @@ else:
     where_date = f"EXTRACT(DATE FROM TIMESTAMP_ADD(C.checkOutDate, INTERVAL -6 HOUR)) = '{max_date}'"
 
 query_kigo = f"""
-SELECT TIMESTAMP_ADD(C.checkOutDate, INTERVAL -6 HOUR) AS Salidas, L.QR, L.function_, CAT.gateName, C.userId, c.id
+SELECT TIMESTAMP_ADD(C.checkOutDate, INTERVAL -6 HOUR) AS Salidas, L.QR, L.function_, CAT.gateName, C.userId, c.id, T.qrCode AS ticket, 
 FROM `parkimovil-app`.cargomovil_pd.PKM_SMART_QR_CHECKOUT C
 JOIN `parkimovil-app`.cargomovil_pd.PKM_PARKING_LOT_GATE_CAT CAT
     ON C.parkingLotId = CAT.parkingLotId
@@ -62,8 +56,10 @@ JOIN `parkimovil-app`.geosek_raspis.log L
     ON CAT.geoSekMapping = L.QR
 JOIN `parkimovil-app`.geosek_raspis.raspis R
     ON L.QR = R.qr
+JOIN parkimovil-app.cargomovil_pd.PKM_SMART_QR_TRANSACTIONS T
+    ON C.Id = T.checkOutId
 WHERE c.parkingLotId = 233 AND gateName LIKE 'Salida%' AND {where_date}
-GROUP BY C.checkOutDate, L.QR, L.function_, CAT.gateName, C.userId, c.id
+GROUP BY C.checkOutDate, L.QR, L.function_, CAT.gateName, C.userId, c.id, T.qrCode
 ORDER BY Salidas ASC;
 """
 
@@ -78,8 +74,26 @@ for index, row in df.iterrows():
     filtro = (df_query_kigo['gateName'] == row['Etiqueta Salida']) & (abs(df_query_kigo['Salidas'] - row['Fecha/Hora']) < pd.Timedelta(seconds=3))
     if filtro.any():
         df.at[index, 'KIGO'] = True
+        ticket_info = df_query_kigo.loc[filtro]
+        ticket = ticket_info['ticket'].values[0]
+        salida = ticket_info['Salidas'].values[0]
+        salida_kigo = ticket_info['QR'].values[0]
+        df.at[index, 'Ticket'] = ticket
+        df.at[index, 'Fecha/Hora Kigo'] = salida
+        df.at[index, 'QR'] = salida_kigo
 
-st.write(df_query_kigo)
-
-st.write("Contenido del archivo")
+st.write("Análisis")
 st.dataframe(df)
+@st.cache_data
+def get_binary_file_downloader_html(bin_file, file_label='File'):
+    with open(bin_file, 'rb') as f:
+        data = f.read()
+    bin_str = base64.b64encode(data).decode()
+    href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{bin_file}">{file_label}</a>'
+    return href
+
+if st.button('Descargar tabla como Excel'):
+        with pd.ExcelWriter('kigo_arboleda.xlsx', engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False)
+        st.success('Tabla descargada exitosamente!')
+        st.markdown(get_binary_file_downloader_html('kigo_arboleda.xlsx', 'Descargar tabla como Excel'), unsafe_allow_html=True)
