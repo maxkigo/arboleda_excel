@@ -5,3 +5,4 @@ google-cloud-bigquery
 openpyxl
 xlrd
 python-dotenv
+db-dtypes
