@@ -96,7 +96,11 @@ df_query_kigo['Salidas'] = pd.to_datetime(df_query_kigo['Salidas'])
 df['KIGO'] = False
 
 for index, row in df.iterrows():
-    filtro = (df_query_kigo['gateName'] == row['Etiqueta Salida']) & (abs(df_query_kigo['Salidas'] - row['Fecha/Hora']) == pd.Timedelta(seconds=3))
+    filtro = (
+    (df_query_kigo['gateName'] == row['Etiqueta Salida']) &
+    (df_query_kigo['Salidas'] < row['Fecha/Hora']) &
+    (abs(df_query_kigo['Salidas'] - row['Fecha/Hora']) <= pd.Timedelta(seconds=5))
+)
     if filtro.any():
         df.at[index, 'KIGO'] = True
         ticket_info = df_query_kigo.loc[filtro]
